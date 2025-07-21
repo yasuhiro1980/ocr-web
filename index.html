@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OCR Test</title>
+</head>
+<body>
+  <h2>鋼板OCR読み取り</h2>
+  <input type="file" id="cameraInput" accept="image/*" capture="environment">
+  <canvas id="preview" style="display:none;"></canvas>
+  <div id="result">読み取り結果:</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script>
+    document.getElementById('cameraInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.getElementById('preview');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        Tesseract.recognize(canvas, 'eng', {
+          logger: m => console.log(m)
+        }).then(({ data: { text } }) => {
+          const cleaned = text.replace(/[^A-Z0-9\-]/gi, '').trim();
+          document.getElementById('result').textContent = `読み取り結果: ${cleaned}`;
+        });
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  </script>
+</body>
+</html>
