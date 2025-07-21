@@ -1,38 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>OCR Test</title>
+  <title>リアルタイムOCR</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+  <style>
+    video, canvas {
+      max-width: 100%;
+      border: 1px solid #ccc;
+    }
+    #result {
+      font-size: 1.5rem;
+      color: green;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
-  <h2>鋼板OCR読み取り</h2>
-  <input type="file" id="cameraInput" accept="image/*" capture="environment">
-  <canvas id="preview" style="display:none;"></canvas>
-  <div id="result">読み取り結果:</div>
+  <h1>リアルタイムOCR（英数字＋ハイフン）</h1>
+  <video id="video" autoplay playsinline width="300" height="200"></video>
+  <canvas id="canvas" width="300" height="200" style="display: none;"></canvas>
+  <div id="result">読み取り結果がここに表示されるけん！</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
   <script>
-    document.getElementById('cameraInput').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const resultDiv = document.getElementById('result');
+    const context = canvas.getContext('2d');
 
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.getElementById('preview');
-        const ctx = canvas.getContext('2d');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
+    // カメラ起動
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(err => {
+        alert('カメラにアクセスできんかったけん：' + err);
+      });
 
-        Tesseract.recognize(canvas, 'eng', {
-          logger: m => console.log(m)
-        }).then(({ data: { text } }) => {
-          const cleaned = text.replace(/[^A-Z0-9\-]/gi, '').trim();
-          document.getElementById('result').textContent = `読み取り結果: ${cleaned}`;
-        });
-      };
-      img.src = URL.createObjectURL(file);
-    });
+    // OCR処理（2秒ごと）
+    setInterval(() => {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      Tesseract.recognize(canvas, 'eng', {
+        logger: m => console.log(m)
+      }).then(({ data: { text } }) => {
+        const cleaned = text.replace(/[^A-Z0-9\-]/gi, '').trim(); // 英数字とハイフンのみ
+        if (cleaned) {
+          resultDiv.innerText = '読み取り結果：' + cleaned;
+        }
+      });
+    }, 2000); // 2秒ごとにOCR
   </script>
 </body>
 </html>
