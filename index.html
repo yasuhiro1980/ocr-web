@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>英数字・ハイフン専用 カメラOCR</title>
+  <title>英数字・ハイフン専用 カメラOCR v2</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     :root {
@@ -11,30 +11,24 @@
       --card: #1e293b;
       --border: #334155;
       --text: #f8fafc;
-      --subtext: #94a3b8;
+      --sub: #94a3b8;
       --accent: #38bdf8;
-      --accent-strong: #0284c7;
-      --success: #22c55e;
-      --warning: #f59e0b;
-      --danger: #ef4444;
+      --primary: #0284c7;
+      --ok: #22c55e;
+      --warn: #f59e0b;
     }
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-tap-highlight-color: transparent;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", sans-serif;
-      background-color: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+      background: var(--bg);
       color: var(--text);
       min-height: 100dvh;
       display: flex;
       flex-direction: column;
-      padding-bottom: env(safe-area-inset-bottom, 16px);
+      padding-bottom: env(safe-area-inset-bottom, 20px);
     }
     header {
-      padding: 12px 16px;
+      padding: 10px 14px;
       background: rgba(30, 41, 59, 0.95);
       border-bottom: 1px solid var(--border);
       display: flex;
@@ -44,42 +38,34 @@
       top: 0;
       z-index: 20;
     }
-    header h1 {
-      font-size: 16px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-    .status-badge {
+    header h1 { font-size: 15px; font-weight: 700; }
+    .badge {
       font-size: 12px;
       padding: 4px 10px;
-      border-radius: 9999px;
+      border-radius: 999px;
       background: #334155;
-      color: var(--subtext);
+      color: var(--sub);
       font-weight: 600;
     }
-    .status-badge.ready {
-      background: rgba(34, 197, 94, 0.2);
-      color: #4ade80;
-    }
-    .status-badge.busy {
-      background: rgba(245, 158, 11, 0.2);
-      color: #fbbf24;
-    }
+    .badge.ready { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+    .badge.busy { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+
     main {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      padding: 12px;
+      gap: 10px;
+      padding: 10px 12px;
       max-width: 600px;
       width: 100%;
       margin: 0 auto;
     }
-    /* Camera Viewfinder */
-    .camera-container {
+
+    /* カメラビュー */
+    .cam-wrap {
       position: relative;
       width: 100%;
-      height: 240px;
+      height: 220px;
       background: #000;
       border-radius: 12px;
       overflow: hidden;
@@ -89,107 +75,145 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
+      transform-origin: center center;
     }
     .overlay {
       position: absolute;
       inset: 0;
       display: flex;
-      flex-direction: column;
       justify-content: center;
       align-items: center;
       pointer-events: none;
-      background: rgba(0, 0, 0, 0.45);
     }
-    /* Guide Box (ROI) */
-    .roi-box {
-      width: 86%;
-      height: 72px;
+    .roi {
+      width: 82%;
+      height: 64px;
       border: 2px solid var(--accent);
       border-radius: 8px;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
       position: relative;
-      background: transparent;
-      transition: border-color 0.2s;
+      transition: border-color 0.2s, width 0.2s, height 0.2s;
     }
-    .roi-box.detected {
-      border-color: var(--success);
-    }
+    .roi.detected { border-color: var(--ok); }
     .roi-label {
       position: absolute;
-      top: -24px;
+      top: -22px;
       left: 0;
       right: 0;
       text-align: center;
-      font-size: 12px;
+      font-size: 11px;
       color: #fff;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      text-shadow: 0 1px 3px #000;
     }
-    .camera-controls {
+
+    /* ズーム＆前処理クイックバー */
+    .quick-bar {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      align-items: center;
+      font-size: 12px;
+    }
+    .quick-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .quick-item label {
+      color: var(--sub);
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    select {
+      background: #0f172a;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 6px;
+      font-size: 12px;
+      width: 100%;
+    }
+
+    /* OCR入力プレビュー（実際に認識エンジンに渡される画像） */
+    .preview-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .preview-hd {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--sub);
+    }
+    canvas#procCanvas {
+      width: 100%;
+      height: 52px;
+      object-fit: contain;
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* ボタン群 */
+    .controls {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 8px;
     }
     button {
-      appearance: none;
       border: none;
       border-radius: 10px;
       padding: 12px 14px;
       font-size: 15px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      transition: opacity 0.15s, transform 0.1s;
     }
-    button:active {
-      transform: scale(0.98);
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .btn-primary {
-      background: var(--accent-strong);
-      color: #fff;
-    }
-    .btn-secondary {
-      background: var(--card);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-    .btn-success {
-      background: var(--success);
-      color: #052e16;
-    }
-    .btn-Auto.active {
+    button:disabled { opacity: 0.5; }
+    .btn-pri { background: var(--primary); color: #fff; }
+    .btn-sec { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    .btn-ok { background: var(--ok); color: #052e16; }
+    .btn-auto.active {
       background: rgba(34, 197, 94, 0.2);
-      border-color: var(--success);
+      border-color: var(--ok);
       color: #4ade80;
     }
-    /* Result Card */
+
+    /* 結果カード */
     .card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 14px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
-    .card-header {
+    .card-hd {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 13px;
-      color: var(--subtext);
+      font-size: 12px;
+      color: var(--sub);
       font-weight: 600;
     }
-    .result-input-group {
-      display: flex;
-      gap: 8px;
-    }
+    .res-group { display: flex; gap: 8px; }
     input[type="text"] {
       width: 100%;
       background: #0f172a;
@@ -198,121 +222,77 @@
       padding: 10px 12px;
       color: var(--text);
       font-size: 18px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: ui-monospace, SFMono-Regular, monospace;
       letter-spacing: 0.08em;
     }
-    .raw-preview {
+    .raw-row {
       font-size: 12px;
-      color: var(--subtext);
-      font-family: ui-monospace, SFMono-Regular, monospace;
+      color: var(--sub);
+      font-family: ui-monospace, monospace;
       display: flex;
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 4px;
     }
-    .rule-pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
+    .pills { display: flex; flex-wrap: wrap; gap: 6px; }
     .pill {
       font-size: 11px;
       padding: 3px 8px;
       border-radius: 6px;
       background: #0f172a;
       border: 1px solid var(--border);
-      color: var(--subtext);
+      color: var(--sub);
     }
-    .pill strong {
-      color: var(--accent);
-    }
-    /* Settings Accordion */
-    details.card {
-      padding: 0;
-      overflow: hidden;
-    }
+    .pill strong { color: var(--accent); }
+
+    details.card { padding: 0; overflow: hidden; }
     details summary {
-      padding: 13px 14px;
-      font-size: 14px;
+      padding: 12px 14px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       list-style: none;
       display: flex;
       justify-content: space-between;
-      align-items: center;
     }
-    details summary::-webkit-details-marker {
-      display: none;
-    }
+    details summary::-webkit-details-marker { display: none; }
     .settings-body {
-      padding: 0 14px 14px;
+      padding: 12px 14px 14px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       border-top: 1px solid var(--border);
-      padding-top: 12px;
     }
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .field label {
-      font-size: 12px;
-      color: var(--subtext);
-      font-weight: 600;
-    }
-    .field input[type="text"] {
-      font-size: 16px;
-      padding: 8px 10px;
-      letter-spacing: 0.04em;
-    }
-    .field-hint {
-      font-size: 11px;
-      color: var(--subtext);
-    }
-    .checkbox-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-    }
-    .checkbox-row input {
-      width: 18px;
-      height: 18px;
-    }
-    /* History List */
-    .history-list {
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 12px; color: var(--sub); font-weight: 600; }
+    .field input[type="text"] { font-size: 16px; padding: 8px 10px; }
+    .hint { font-size: 11px; color: var(--sub); }
+    .chk-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .hist-list {
       list-style: none;
       display: flex;
       flex-direction: column;
       gap: 6px;
-      max-height: 180px;
+      max-height: 150px;
       overflow-y: auto;
     }
-    .history-item {
+    .hist-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 8px 10px;
+      padding: 7px 10px;
       background: #0f172a;
       border-radius: 8px;
-      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-family: ui-monospace, monospace;
       font-size: 14px;
     }
-    .history-item button {
-      padding: 4px 10px;
-      font-size: 12px;
-    }
-    canvas#procCanvas {
-      display: none;
-    }
+    .hist-item button { padding: 4px 10px; font-size: 12px; }
     .toast {
       position: fixed;
       bottom: 24px;
       left: 50%;
       transform: translateX(-50%);
-      background: var(--success);
+      background: var(--ok);
       color: #052e16;
       padding: 8px 16px;
       border-radius: 999px;
@@ -323,113 +303,139 @@
       transition: opacity 0.2s;
       z-index: 50;
     }
-    .toast.show {
-      opacity: 1;
-    }
+    .toast.show { opacity: 1; }
   </style>
 </head>
 <body>
   <header>
-    <h1>英数字・ハイフン カメラOCR</h1>
-    <span id="statusBadge" class="status-badge">初期化中...</span>
+    <h1>英数字・ハイフン カメラOCR v2</h1>
+    <span id="statusBadge" class="badge">初期化中...</span>
   </header>
 
   <main>
     <!-- カメラプレビュー -->
-    <div class="camera-container">
+    <div class="cam-wrap">
       <video id="video" playsinline autoplay muted></video>
       <div class="overlay">
-        <div id="roiBox" class="roi-box">
-          <div class="roi-label">枠内に文字列を合わせてください</div>
+        <div id="roiBox" class="roi">
+          <div class="roi-label">20cmほど離してズームするとピントが合います</div>
         </div>
       </div>
+    </div>
+
+    <!-- ピント対策ズーム＆画像前処理モード切替 -->
+    <div class="quick-bar">
+      <div class="quick-item">
+        <label for="zoomRange"><span>カメラ倍率（ピント対策）</span><span id="zoomVal">1.5x</span></label>
+        <input type="range" id="zoomRange" min="1" max="3" step="0.1" value="1.5">
+      </div>
+      <div class="quick-item">
+        <label for="prepMode"><span>画像処理モード</span></label>
+        <select id="prepMode">
+          <option value="norm" selected>標準（自動コントラスト補正）</option>
+          <option value="otsu">くっきり白黒（二値化）</option>
+          <option value="raw">無加工（画面・紙文字向け）</option>
+          <option value="invert">白抜き文字反転（黒背景に白字）</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- OCRに渡される切り出し画像のリアルタイム確認 -->
+    <div class="preview-box">
+      <div class="preview-hd">
+        <span>OCR入力プレビュー（この画像が鮮明に見えるよう距離を調整）</span>
+        <span id="psmLabel">認識モード: ブロック(PSM 6)</span>
+      </div>
+      <canvas id="procCanvas" width="400" height="100"></canvas>
     </div>
 
     <!-- 操作ボタン -->
-    <div class="camera-controls">
-      <button id="scanBtn" class="btn-primary" disabled>1回読み取り</button>
-      <button id="autoBtn" class="btn-secondary btn-Auto" disabled>連続スキャン: OFF</button>
+    <div class="controls">
+      <button id="scanBtn" class="btn-pri" disabled>📸 1回読み取り</button>
+      <button id="autoBtn" class="btn-sec btn-auto" disabled>連続スキャン: OFF</button>
     </div>
 
-    <!-- 読み取り結果 -->
+    <!-- 結果表示 -->
     <div class="card">
-      <div class="card-header">
-        <span>読み取り結果（タップして編集可能）</span>
+      <div class="card-hd">
+        <span>読み取り結果（1文字から認識・タップで編集可）</span>
         <span id="confidenceText">信頼度: --%</span>
       </div>
-      <div class="result-input-group">
+      <div class="res-group">
         <input type="text" id="resultInput" placeholder="ここに結果が表示されます" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
-        <button id="copyBtn" class="btn-success" style="white-space: nowrap;">コピー</button>
+        <button id="copyBtn" class="btn-ok" style="white-space: nowrap;">コピー</button>
       </div>
-      <div class="raw-preview">
-        <span id="rawText">生データ: --</span>
+      <div class="raw-row">
+        <span id="rawText">OCR生テキスト: --</span>
         <span id="validationStatus"></span>
       </div>
-      <div class="rule-pills" id="activeRulePills"></div>
+      <div class="pills" id="activeRulePills"></div>
     </div>
 
-    <!-- 文字ルール・フィルター設定 -->
+    <!-- 詳細ルール設定 -->
     <details class="card">
       <summary>
-        <span>文字ルール・除外設定</span>
-        <span style="font-size: 12px; color: var(--accent);">変更 ▼</span>
+        <span>文字ルール・認識モード詳細設定</span>
+        <span style="font-size: 12px; color: var(--accent);">開く ▼</span>
       </summary>
       <div class="settings-body">
         <div class="field">
-          <label for="excludedChars">使用しない英字（カンマ不要・連続入力）</label>
-          <input type="text" id="excludedChars" value="IO" autocapitalize="characters">
-          <span class="field-hint">例: <code>IO</code> を指定すると <code>I</code> と <code>O</code> をOCR候補から除外します。</span>
+          <label for="psmSelect">文字レイアウト認識モード（PSM）</label>
+          <select id="psmSelect">
+            <option value="6" selected>PSM 6: 単一ブロック（汎用・一番読める設定）</option>
+            <option value="7">PSM 7: 1行の文字列として認識</option>
+            <option value="8">PSM 8: 1単語・1文字列として認識</option>
+            <option value="11">PSM 11: まばらな文字（1文字や刻印向け）</option>
+          </select>
         </div>
 
         <div class="field">
-          <label for="replaceMap">類似文字の自動置換ルール（任意）</label>
-          <input type="text" id="replaceMap" value="I:1,l:1,O:0,o:0">
-          <span class="field-hint">カンマ区切りで <code>誤認識文字:変換後</code> を指定（除外前に置換されます）。</span>
+          <label for="excludedChars">使用しない英字（連続入力）</label>
+          <input type="text" id="excludedChars" value="IO" autocapitalize="characters">
+          <span class="hint">例: IO を指定すると I と O を最終結果から除外します。</span>
+        </div>
+
+        <div class="field">
+          <label for="replaceMap">類似文字の自動置換ルール（カンマ区切り）</label>
+          <input type="text" id="replaceMap" value="I:1,l:1,|:1,O:0,o:0">
+          <span class="hint">例: I:1,l:1,O:0（OCRが I や O と読んだ文字を数字に変換します）。</span>
         </div>
 
         <div class="field">
           <label for="regexPattern">フォーマット正規表現チェック（任意）</label>
           <input type="text" id="regexPattern" placeholder="例: ^[A-Z0-9]{4}-[A-Z0-9]{2,4}$">
-          <span class="field-hint">指定すると、形式に一致したときのみ確定・通知します。</span>
         </div>
 
-        <label class="checkbox-row">
+        <label class="chk-row">
           <input type="checkbox" id="uppercaseOnly" checked>
-          <span>英字は大文字のみ許可（小文字を大文字に統一）</span>
+          <span>英字は大文字のみ許可（小文字を大文字に自動変換）</span>
         </label>
 
-        <label class="checkbox-row">
-          <input type="checkbox" id="highContrast" checked>
-          <span>高コントラスト前処理（刻印・ラベル向けに二値化強調）</span>
-        </label>
-
-        <button id="applyRulesBtn" class="btn-secondary">設定を保存してOCRエンジンに反映</button>
+        <button id="applyRulesBtn" class="btn-sec">設定を保存して反映</button>
       </div>
     </details>
 
-    <!-- 読み取り履歴 -->
+    <!-- 履歴 -->
     <div class="card">
-      <div class="card-header">
+      <div class="card-hd">
         <span>読み取り履歴</span>
-        <button id="clearHistoryBtn" class="btn-secondary" style="padding: 4px 8px; font-size: 11px;">履歴クリア</button>
+        <button id="clearHistoryBtn" class="btn-sec" style="padding: 4px 8px; font-size: 11px;">クリア</button>
       </div>
-      <ul id="historyList" class="history-list"></ul>
+      <ul id="historyList" class="hist-list"></ul>
     </div>
   </main>
 
-  <canvas id="procCanvas"></canvas>
   <div id="toast" class="toast">コピーしました</div>
 
   <script>
-    // ==========================================
-    // デフォルト文字ルール設定（コード内で直接固定も可能）
-    // ==========================================
     const DEFAULT_CONFIG = {
-      excludedChars: 'IO',               // 使用しない文字（例: I, O）
-      replaceMapStr: 'I:1,l:1,O:0,o:0',  // 誤認識しやすい文字の置換マップ
-      regexPattern: '',                  // 例: '^[A-Z0-9]{4}-[A-Z0-9]+$'
+      excludedChars: 'IO',
+      replaceMapStr: 'I:1,l:1,|:1,O:0,o:0',
+      regexPattern: '',
       uppercaseOnly: true,
-      highContrast: true
+      prepMode: 'norm',
+      psm: '6',
+      zoom: 1.5
     };
 
     const video = document.getElementById('video');
@@ -447,30 +453,39 @@
     const procCanvas = document.getElementById('procCanvas');
     const toast = document.getElementById('toast');
 
+    const zoomRange = document.getElementById('zoomRange');
+    const zoomVal = document.getElementById('zoomVal');
+    const prepModeSelect = document.getElementById('prepMode');
+    const psmSelect = document.getElementById('psmSelect');
+    const psmLabel = document.getElementById('psmLabel');
     const excludedCharsInput = document.getElementById('excludedChars');
     const replaceMapInput = document.getElementById('replaceMap');
     const regexPatternInput = document.getElementById('regexPattern');
     const uppercaseOnlyInput = document.getElementById('uppercaseOnly');
-    const highContrastInput = document.getElementById('highContrast');
     const applyRulesBtn = document.getElementById('applyRulesBtn');
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
     let worker = null;
     let isRecognizing = false;
     let autoScanTimer = null;
-    let lastCandidate = '';
+    let previewTimer = null;
     let historyItems = [];
+    let currentZoom = 1.5;
+    let hwZoomSupported = false;
+    let videoTrack = null;
 
-    // 設定の読み込み
     function loadConfig() {
       try {
-        const saved = JSON.parse(localStorage.getItem('ocr_rule_config') || '{}');
-        const cfg = { ...DEFAULT_CONFIG, ...saved };
+        const cfg = { ...DEFAULT_CONFIG, ...JSON.parse(localStorage.getItem('ocr_rule_config_v2') || '{}') };
         excludedCharsInput.value = cfg.excludedChars;
         replaceMapInput.value = cfg.replaceMapStr;
         regexPatternInput.value = cfg.regexPattern;
         uppercaseOnlyInput.checked = cfg.uppercaseOnly;
-        highContrastInput.checked = cfg.highContrast;
+        prepModeSelect.value = cfg.prepMode || 'norm';
+        psmSelect.value = cfg.psm || '6';
+        currentZoom = parseFloat(cfg.zoom) || 1.5;
+        zoomRange.value = currentZoom;
+        zoomVal.textContent = currentZoom.toFixed(1) + 'x';
         return cfg;
       } catch (e) {
         return { ...DEFAULT_CONFIG };
@@ -483,19 +498,17 @@
         replaceMapStr: (replaceMapInput.value || '').trim(),
         regexPattern: (regexPatternInput.value || '').trim(),
         uppercaseOnly: uppercaseOnlyInput.checked,
-        highContrast: highContrastInput.checked
+        prepMode: prepModeSelect.value,
+        psm: psmSelect.value,
+        zoom: currentZoom
       };
     }
 
-    // 許可文字（ホワイトリスト）の生成
-    function buildWhitelist(cfg) {
-      const baseDigits = '0123456789';
-      const baseUpper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      const baseLower = cfg.uppercaseOnly ? '' : 'abcdefghijklmnopqrstuvwxyz';
-      const excludedSet = new Set(cfg.excludedChars.split(''));
-      const allowedUpper = baseUpper.split('').filter(c => !excludedSet.has(c)).join('');
-      const allowedLower = baseLower.split('').filter(c => !excludedSet.has(c.toUpperCase())).join('');
-      return baseDigits + allowedUpper + allowedLower + '-';
+    function buildFinalAllowedSet(cfg) {
+      const ex = new Set(cfg.excludedChars.split(''));
+      const up = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').filter(c => !ex.has(c)).join('');
+      const lo = cfg.uppercaseOnly ? '' : 'abcdefghijklmnopqrstuvwxyz'.split('').filter(c => !ex.has(c.toUpperCase())).join('');
+      return new Set(('0123456789' + up + lo + '-').split(''));
     }
 
     function renderRulePills(cfg) {
@@ -503,30 +516,34 @@
         `<span class="pill">許可: <strong>英数字 + ハイフン(-)</strong></span>`,
         `<span class="pill">除外文字: <strong>${cfg.excludedChars || 'なし'}</strong></span>`
       ];
-      if (cfg.replaceMapStr) {
-        pills.push(`<span class="pill">自動補正: <strong>${cfg.replaceMapStr}</strong></span>`);
-      }
-      if (cfg.regexPattern) {
-        pills.push(`<span class="pill">形式: <strong>${cfg.regexPattern}</strong></span>`);
-      }
+      if (cfg.replaceMapStr) pills.push(`<span class="pill">自動補正: <strong>${cfg.replaceMapStr}</strong></span>`);
+      if (cfg.regexPattern) pills.push(`<span class="pill">形式: <strong>${cfg.regexPattern}</strong></span>`);
       activeRulePills.innerHTML = pills.join('');
+      psmLabel.textContent = `認識モード: PSM ${cfg.psm}`;
     }
 
-    // OCR結果の事後フィルタリング＆ルール適用
+    // OCR生テキストに対して置換ルール＆除外文字ルールを適用
     function applyCharacterRules(rawStr, cfg) {
-      let s = (rawStr || '').trim();
-      // 全角ハイフン・長音・ダッシュ類を半角ハイフンに統一
-      s = s.replace(/[ー−―–—‐]/g, '-');
-      // 空白を除去
-      s = s.replace(/\s+/g, '');
+      if (!rawStr) return '';
+      // 複数行ある場合は最も英数字が多い行を優先しつつ改行をスペース化
+      const lines = rawStr.split(/[
+]+/).map(l => l.trim()).filter(Boolean);
+      let bestLine = lines.join('');
+      if (lines.length > 1) {
+        lines.sort((a, b) => (b.replace(/[^A-Za-z0-9-]/g, '').length) - (a.replace(/[^A-Za-z0-9-]/g, '').length));
+        bestLine = lines[0];
+      }
 
-      // 1. 置換マップ適用 (例: I->1, O->0)
+      let s = bestLine.replace(/[ー−―–—‐_]/g, '-').replace(/\s+/g, '');
+
+      // 1. 類似文字の自動置換（除外判定の前に I->1, O->0 などを変換）
       if (cfg.replaceMapStr) {
-        const pairs = cfg.replaceMapStr.split(',');
-        for (const pair of pairs) {
-          const [fromChar, toChar] = pair.split(':').map(x => x ? x.trim() : '');
-          if (fromChar && toChar !== undefined) {
-            s = s.split(fromChar).join(toChar);
+        for (const pair of cfg.replaceMapStr.split(',')) {
+          const idx = pair.indexOf(':');
+          if (idx > 0) {
+            const f = pair.slice(0, idx).trim();
+            const t = pair.slice(idx + 1).trim();
+            if (f) s = s.split(f).join(t);
           }
         }
       }
@@ -536,122 +553,204 @@
         s = s.toUpperCase();
       }
 
-      // 3. 許可された文字（英数字・ハイフン かつ 除外文字以外）のみ残す
-      const whitelist = buildWhitelist(cfg);
-      const allowedSet = new Set(whitelist.split(''));
-      s = s.split('').filter(ch => allowedSet.has(ch)).join('');
+      // 3. 許可された文字（英数字・ハイフン かつ 除外文字以外）のみ抽出
+      const allowed = buildFinalAllowedSet(cfg);
+      s = s.split('').filter(ch => allowed.has(ch)).join('');
 
-      // 4. 連続するハイフンや先頭・末尾の不要なハイフンを整理
-      s = s.replace(/-+/g, '-').replace(/^-|-$/g, '');
-
-      return s;
+      // 4. 連続ハイフン・先頭末尾ハイフンの整理
+      return s.replace(/-+/g, '-').replace(/^-|-$/g, '');
     }
 
-    // カメラ起動（iPhone Safari 背面カメラ対応）
+    // ズーム適用（ハードウェア対応時はカメラズーム、非対応時はCSS＆切り出しズーム）
+    async function applyZoom(z) {
+      currentZoom = parseFloat(z) || 1.0;
+      zoomVal.textContent = currentZoom.toFixed(1) + 'x';
+      if (videoTrack && hwZoomSupported) {
+        try {
+          await videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+          video.style.transform = 'scale(1)';
+          return;
+        } catch (e) {}
+      }
+      video.style.transform = `scale(${currentZoom})`;
+    }
+
     async function startCamera() {
-      const constraints = {
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
           facingMode: { ideal: 'environment' },
           width: { ideal: 1920 },
           height: { ideal: 1080 }
         }
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      });
       video.srcObject = stream;
       await video.play();
+
+      videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack && videoTrack.getCapabilities) {
+        const caps = videoTrack.getCapabilities();
+        if (caps && caps.zoom) {
+          hwZoomSupported = true;
+          zoomRange.min = caps.zoom.min || 1;
+          zoomRange.max = Math.min(4, caps.zoom.max || 3);
+        }
+      }
+      await applyZoom(currentZoom);
     }
 
-    // Tesseract.js 初期化
     async function initOCR() {
       try {
         statusBadge.textContent = 'カメラ起動中...';
         await startCamera();
 
-        statusBadge.textContent = 'OCRエンジン準備中...';
-        statusBadge.className = 'status-badge busy';
+        // リアルタイムで切り出しプレビューを更新（ピント確認用）
+        previewTimer = setInterval(() => {
+          if (!isRecognizing) captureROI(getCurrentConfig().prepMode);
+        }, 250);
+
+        statusBadge.textContent = 'OCRエンジン読込中...';
+        statusBadge.className = 'badge busy';
 
         worker = await Tesseract.createWorker('eng');
         await updateWorkerParams();
 
         statusBadge.textContent = '準備完了';
-        statusBadge.className = 'status-badge ready';
+        statusBadge.className = 'badge ready';
         scanBtn.disabled = false;
         autoBtn.disabled = false;
       } catch (err) {
         console.error(err);
-        statusBadge.textContent = 'エラー: カメラ許可またはHTTPSを確認';
-        statusBadge.className = 'status-badge';
+        statusBadge.textContent = 'エラー: カメラ許可を確認';
       }
     }
 
     async function updateWorkerParams() {
       const cfg = getCurrentConfig();
-      localStorage.setItem('ocr_rule_config', JSON.stringify(cfg));
+      localStorage.setItem('ocr_rule_config_v2', JSON.stringify(cfg));
       renderRulePills(cfg);
       if (!worker) return;
-      const whitelist = buildWhitelist(cfg);
+      // Tesseract側には大文字小文字の英数字＋ハイフンを渡し、I->1 置換や除外はJS後処理で行うことで認識落ちを防ぐ
       await worker.setParameters({
-        tessedit_pageseg_mode: '7', // 1行の文字列として認識
-        tessedit_char_whitelist: whitelist
+        tessedit_pageseg_mode: cfg.psm,
+        tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-|'
       });
     }
 
-    // ガイド枠（ROI）領域を切り出して前処理
-    function captureROI(highContrast) {
+    // ガイド枠（ROI）を切り出し、余白パディング＆適応型前処理を施す
+    function captureROI(prepMode) {
       const vw = video.videoWidth;
       const vh = video.videoHeight;
       if (!vw || !vh) return null;
 
-      const containerRect = video.getBoundingClientRect();
-      const roiRect = roiBox.getBoundingClientRect();
+      const cRect = video.getBoundingClientRect();
+      const rRect = roiBox.getBoundingClientRect();
 
-      // object-fit: cover の表示比率から実ビデオ座標へ変換
-      const scale = Math.max(containerRect.width / vw, containerRect.height / vh);
-      const renderedW = vw * scale;
-      const renderedH = vh * scale;
-      const offsetX = (renderedW - containerRect.width) / 2;
-      const offsetY = (renderedH - containerRect.height) / 2;
+      // CSS拡大も含めた画面表示上の比率からビデオ内座標を算出
+      const baseW = cRect.width / (hwZoomSupported ? 1 : currentZoom);
+      const baseH = cRect.height / (hwZoomSupported ? 1 : currentZoom);
+      const scale = Math.max(baseW / vw, baseH / vh);
 
-      const relX = roiRect.left - containerRect.left + offsetX;
-      const relY = roiRect.top - containerRect.top + offsetY;
+      // 画面中心からのオフセット
+      const centerX = vw / 2;
+      const centerY = vh / 2;
+      const roiW_video = (rRect.width / (hwZoomSupported ? 1 : currentZoom)) / scale;
+      const roiH_video = (rRect.height / (hwZoomSupported ? 1 : currentZoom)) / scale;
 
-      const cropX = Math.max(0, Math.floor(relX / scale));
-      const cropY = Math.max(0, Math.floor(relY / scale));
-      const cropW = Math.min(vw - cropX, Math.floor(roiRect.width / scale));
-      const cropH = Math.min(vh - cropY, Math.floor(roiRect.height / scale));
+      const cropX = Math.max(0, Math.floor(centerX - roiW_video / 2));
+      const cropY = Math.max(0, Math.floor(centerY - roiH_video / 2));
+      const cropW = Math.min(vw - cropX, Math.floor(roiW_video));
+      const cropH = Math.min(vh - cropY, Math.floor(roiH_video));
 
-      procCanvas.width = cropW;
-      procCanvas.height = cropH;
+      if (cropW <= 10 || cropH <= 10) return null;
+
+      // Tesseractが最も認識しやすい高さ（中身90px＋上下左右に20pxの白余白）に正規化
+      const targetInnerH = 90;
+      const targetInnerW = Math.round((cropW / cropH) * targetInnerH);
+      const pad = 20;
+
+      procCanvas.width = targetInnerW + pad * 2;
+      procCanvas.height = targetInnerH + pad * 2;
       const ctx = procCanvas.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-      if (highContrast) {
-        const imgData = ctx.getImageData(0, 0, cropW, cropH);
+      // 背景を白で塗りつぶす（Tesseractは周囲に白余白があると認識精度が大幅に向上する）
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, procCanvas.width, procCanvas.height);
+
+      // 中央にROI画像を描画
+      ctx.drawImage(video, cropX, cropY, cropW, cropH, pad, pad, targetInnerW, targetInnerH);
+
+      if (prepMode !== 'raw') {
+        const imgData = ctx.getImageData(pad, pad, targetInnerW, targetInnerH);
         const d = imgData.data;
-        // グレースケール＋コントラスト強調
-        for (let i = 0; i < d.length; i += 4) {
-          const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          const contrast = 1.6;
-          const val = Math.min(255, Math.max(0, ((gray - 128) * contrast) + 128));
-          d[i] = d[i + 1] = d[i + 2] = val;
+        const len = targetInnerW * targetInnerH;
+        const grays = new Uint8Array(len);
+
+        let minG = 255, maxG = 0;
+        for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+          let g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+          if (prepMode === 'invert') g = 255 - g;
+          grays[p] = g;
+          if (g < minG) minG = g;
+          if (g > maxG) maxG = g;
         }
-        ctx.putImageData(imgData, 0, 0);
+
+        const range = Math.max(1, maxG - minG);
+
+        if (prepMode === 'norm' || prepMode === 'invert') {
+          // 自動ヒストグラム正規化＋ガンマ補正（照明ムラに強い）
+          for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+            let norm = ((grays[p] - minG) / range) * 255;
+            // 文字を濃く、背景を白く飛ばすシグモイド風コントラスト
+            norm = norm < 140 ? Math.max(0, norm * 0.75) : Math.min(255, norm * 1.15);
+            d[i] = d[i + 1] = d[i + 2] = Math.round(norm);
+          }
+        } else if (prepMode === 'otsu') {
+          // Otsuの自動二値化
+          const hist = new Int32Array(256);
+          for (let p = 0; p < len; p++) {
+            const norm = Math.round(((grays[p] - minG) / range) * 255);
+            grays[p] = norm;
+            hist[norm]++;
+          }
+          let sum = 0;
+          for (let t = 0; t < 256; t++) sum += t * hist[t];
+          let sumB = 0, wB = 0, maxVar = 0, threshold = 128;
+          for (let t = 0; t < 256; t++) {
+            wB += hist[t];
+            if (wB === 0) continue;
+            const wF = len - wB;
+            if (wF === 0) break;
+            sumB += t * hist[t];
+            const mB = sumB / wB;
+            const mF = (sum - sumB) / wF;
+            const between = wB * wF * (mB - mF) * (mB - mF);
+            if (between > maxVar) {
+              maxVar = between;
+              threshold = t;
+            }
+          }
+          for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+            const v = grays[p] < threshold ? 0 : 255;
+            d[i] = d[i + 1] = d[i + 2] = v;
+          }
+        }
+        ctx.putImageData(imgData, pad, pad);
       }
+
       return procCanvas;
     }
 
-    // 1回スキャン実行
     async function performScan(isAuto = false) {
       if (!worker || isRecognizing) return;
       const cfg = getCurrentConfig();
-      const canvas = captureROI(cfg.highContrast);
+      const canvas = captureROI(cfg.prepMode);
       if (!canvas) return;
 
       isRecognizing = true;
       if (!isAuto) {
         statusBadge.textContent = '解析中...';
-        statusBadge.className = 'status-badge busy';
+        statusBadge.className = 'badge busy';
       }
 
       try {
@@ -660,52 +759,50 @@
         const filtered = applyCharacterRules(raw, cfg);
         const conf = Math.round(data.confidence || 0);
 
-        rawTextEl.textContent = `生データ: ${raw || '(なし)'}`;
+        rawTextEl.textContent = `OCR生テキスト: ${raw.replace(/[
+]+/g, ' ') || '(検出なし)'}`;
         confidenceText.textContent = `信頼度: ${conf}%`;
 
-        if (filtered.length >= 2) {
+        // 1文字以上認識できていれば結果に反映
+        if (filtered.length >= 1) {
           let isValid = true;
           if (cfg.regexPattern) {
             try {
-              const re = new RegExp(cfg.regexPattern);
-              isValid = re.test(filtered);
-            } catch (e) {
-              isValid = true;
-            }
+              isValid = new RegExp(cfg.regexPattern).test(filtered);
+            } catch (e) {}
           }
 
           if (isValid) {
-            validationStatus.textContent = '✓ ルール適合';
+            validationStatus.textContent = '✓ 認識成功';
             validationStatus.style.color = '#4ade80';
             roiBox.classList.add('detected');
-            setTimeout(() => roiBox.classList.remove('detected'), 500);
+            setTimeout(() => roiBox.classList.remove('detected'), 400);
 
-            // 連続スキャン時は2回連続一致または手動スキャン時に確定
-            if (!isAuto || filtered === lastCandidate) {
+            // 連続スキャン時でも信頼度45%以上なら即時表示
+            if (!isAuto || conf >= 45) {
               resultInput.value = filtered;
               addHistory(filtered);
             }
-            lastCandidate = filtered;
           } else {
             validationStatus.textContent = '⚠ 形式不一致';
             validationStatus.style.color = '#fbbf24';
-            if (!isAuto) {
-              resultInput.value = filtered;
-            }
+            if (!isAuto) resultInput.value = filtered;
           }
+        } else if (!isAuto) {
+          validationStatus.textContent = '文字が見つかりません（プレビューを確認）';
+          validationStatus.style.color = '#f87171';
         }
       } catch (e) {
         console.error(e);
       } finally {
         isRecognizing = false;
         statusBadge.textContent = autoScanTimer ? '連続スキャン中' : '準備完了';
-        statusBadge.className = 'status-badge ready';
+        statusBadge.className = 'badge ready';
       }
     }
 
     function addHistory(text) {
-      if (!text) return;
-      if (historyItems[0] === text) return; // 直前と同じなら重複追加しない
+      if (!text || historyItems[0] === text) return;
       historyItems.unshift(text);
       if (historyItems.length > 20) historyItems.pop();
       renderHistory();
@@ -713,13 +810,13 @@
 
     function renderHistory() {
       if (historyItems.length === 0) {
-        historyList.innerHTML = '<li class="history-item" style="color: var(--subtext); font-family: sans-serif;">まだ履歴はありません</li>';
+        historyList.innerHTML = '<li class="hist-item" style="color:var(--sub);font-family:sans-serif;">まだ履歴はありません</li>';
         return;
       }
       historyList.innerHTML = historyItems.map(item => `
-        <li class="history-item">
+        <li class="hist-item">
           <span>${item}</span>
-          <button class="btn-secondary" onclick="copyText('${item}')">コピー</button>
+          <button class="btn-sec" onclick="copyText('${item}')">コピー</button>
         </li>
       `).join('');
     }
@@ -729,16 +826,22 @@
       try {
         await navigator.clipboard.writeText(text);
         toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 1600);
+        setTimeout(() => toast.classList.remove('show'), 1500);
       } catch (e) {
         resultInput.select();
         document.execCommand('copy');
       }
     };
 
-    // イベント登録
-    scanBtn.addEventListener('click', () => performScan(false));
+    zoomRange.addEventListener('input', (e) => applyZoom(e.target.value));
+    prepModeSelect.addEventListener('change', () => {
+      const cfg = getCurrentConfig();
+      localStorage.setItem('ocr_rule_config_v2', JSON.stringify(cfg));
+      captureROI(cfg.prepMode);
+    });
+    psmSelect.addEventListener('change', () => updateWorkerParams());
 
+    scanBtn.addEventListener('click', () => performScan(false));
     autoBtn.addEventListener('click', () => {
       if (autoScanTimer) {
         clearInterval(autoScanTimer);
@@ -747,8 +850,7 @@
         autoBtn.classList.remove('active');
         statusBadge.textContent = '準備完了';
       } else {
-        lastCandidate = '';
-        autoScanTimer = setInterval(() => performScan(true), 1000);
+        autoScanTimer = setInterval(() => performScan(true), 900);
         autoBtn.textContent = '連続スキャン: ON';
         autoBtn.classList.add('active');
         statusBadge.textContent = '連続スキャン中';
@@ -756,27 +858,21 @@
     });
 
     copyBtn.addEventListener('click', () => window.copyText(resultInput.value));
-
     applyRulesBtn.addEventListener('click', async () => {
-      applyRulesBtn.textContent = '反映中...';
       await updateWorkerParams();
-      applyRulesBtn.textContent = '設定を保存してOCRエンジンに反映';
-      toast.textContent = 'ルール設定を更新しました';
+      toast.textContent = '設定を更新しました';
       toast.classList.add('show');
       setTimeout(() => {
         toast.classList.remove('show');
         toast.textContent = 'コピーしました';
-      }, 1600);
+      }, 1500);
     });
-
     clearHistoryBtn.addEventListener('click', () => {
       historyItems = [];
       renderHistory();
     });
 
-    // 起動処理
-    const initialCfg = loadConfig();
-    renderRulePills(initialCfg);
+    renderRulePills(loadConfig());
     renderHistory();
     window.addEventListener('DOMContentLoaded', initOCR);
   </script>
