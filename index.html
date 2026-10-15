@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>英数字・ハイフン専用 カメラOCR v2</title>
+  <title>英数字・ハイフン専用 カメラOCR v2.1</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     :root {
@@ -49,6 +49,7 @@
     }
     .badge.ready { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
     .badge.busy { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .badge.err { background: rgba(239, 68, 68, 0.25); color: #fca5a5; }
 
     main {
       flex: 1;
@@ -308,7 +309,7 @@
 </head>
 <body>
   <header>
-    <h1>英数字・ハイフン カメラOCR v2</h1>
+    <h1>英数字・ハイフン カメラOCR v2.1</h1>
     <span id="statusBadge" class="badge">初期化中...</span>
   </header>
 
@@ -525,9 +526,7 @@
     // OCR生テキストに対して置換ルール＆除外文字ルールを適用
     function applyCharacterRules(rawStr, cfg) {
       if (!rawStr) return '';
-      // 複数行ある場合は最も英数字が多い行を優先しつつ改行をスペース化
-      const lines = rawStr.split(/[
-]+/).map(l => l.trim()).filter(Boolean);
+      const lines = rawStr.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       let bestLine = lines.join('');
       if (lines.length > 1) {
         lines.sort((a, b) => (b.replace(/[^A-Za-z0-9-]/g, '').length) - (a.replace(/[^A-Za-z0-9-]/g, '').length));
@@ -602,17 +601,25 @@
     async function initOCR() {
       try {
         statusBadge.textContent = 'カメラ起動中...';
+        statusBadge.className = 'badge busy';
         await startCamera();
 
         // リアルタイムで切り出しプレビューを更新（ピント確認用）
+        if (previewTimer) clearInterval(previewTimer);
         previewTimer = setInterval(() => {
           if (!isRecognizing) captureROI(getCurrentConfig().prepMode);
         }, 250);
 
         statusBadge.textContent = 'OCRエンジン読込中...';
-        statusBadge.className = 'badge busy';
 
-        worker = await Tesseract.createWorker('eng');
+        worker = await Tesseract.createWorker('eng', 1, {
+          logger: m => {
+            if (!isRecognizing && m && m.status) {
+              const pct = typeof m.progress === 'number' ? ` (${Math.round(m.progress * 100)}%)` : '';
+              statusBadge.textContent = `OCR準備中${pct}`;
+            }
+          }
+        });
         await updateWorkerParams();
 
         statusBadge.textContent = '準備完了';
@@ -621,7 +628,9 @@
         autoBtn.disabled = false;
       } catch (err) {
         console.error(err);
-        statusBadge.textContent = 'エラー: カメラ許可を確認';
+        statusBadge.textContent = 'エラー: カメラ許可または通信を確認';
+        statusBadge.className = 'badge err';
+        rawTextEl.textContent = `詳細: ${err && err.message ? err.message : err}`;
       }
     }
 
@@ -630,7 +639,6 @@
       localStorage.setItem('ocr_rule_config_v2', JSON.stringify(cfg));
       renderRulePills(cfg);
       if (!worker) return;
-      // Tesseract側には大文字小文字の英数字＋ハイフンを渡し、I->1 置換や除外はJS後処理で行うことで認識落ちを防ぐ
       await worker.setParameters({
         tessedit_pageseg_mode: cfg.psm,
         tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-|'
@@ -646,12 +654,10 @@
       const cRect = video.getBoundingClientRect();
       const rRect = roiBox.getBoundingClientRect();
 
-      // CSS拡大も含めた画面表示上の比率からビデオ内座標を算出
       const baseW = cRect.width / (hwZoomSupported ? 1 : currentZoom);
       const baseH = cRect.height / (hwZoomSupported ? 1 : currentZoom);
       const scale = Math.max(baseW / vw, baseH / vh);
 
-      // 画面中心からのオフセット
       const centerX = vw / 2;
       const centerY = vh / 2;
       const roiW_video = (rRect.width / (hwZoomSupported ? 1 : currentZoom)) / scale;
@@ -673,11 +679,8 @@
       procCanvas.height = targetInnerH + pad * 2;
       const ctx = procCanvas.getContext('2d', { willReadFrequently: true });
 
-      // 背景を白で塗りつぶす（Tesseractは周囲に白余白があると認識精度が大幅に向上する）
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, procCanvas.width, procCanvas.height);
-
-      // 中央にROI画像を描画
       ctx.drawImage(video, cropX, cropY, cropW, cropH, pad, pad, targetInnerW, targetInnerH);
 
       if (prepMode !== 'raw') {
@@ -698,15 +701,12 @@
         const range = Math.max(1, maxG - minG);
 
         if (prepMode === 'norm' || prepMode === 'invert') {
-          // 自動ヒストグラム正規化＋ガンマ補正（照明ムラに強い）
           for (let i = 0, p = 0; i < d.length; i += 4, p++) {
             let norm = ((grays[p] - minG) / range) * 255;
-            // 文字を濃く、背景を白く飛ばすシグモイド風コントラスト
             norm = norm < 140 ? Math.max(0, norm * 0.75) : Math.min(255, norm * 1.15);
             d[i] = d[i + 1] = d[i + 2] = Math.round(norm);
           }
         } else if (prepMode === 'otsu') {
-          // Otsuの自動二値化
           const hist = new Int32Array(256);
           for (let p = 0; p < len; p++) {
             const norm = Math.round(((grays[p] - minG) / range) * 255);
@@ -759,11 +759,9 @@
         const filtered = applyCharacterRules(raw, cfg);
         const conf = Math.round(data.confidence || 0);
 
-        rawTextEl.textContent = `OCR生テキスト: ${raw.replace(/[
-]+/g, ' ') || '(検出なし)'}`;
+        rawTextEl.textContent = `OCR生テキスト: ${raw.replace(/\r?\n/g, ' ') || '(検出なし)'}`;
         confidenceText.textContent = `信頼度: ${conf}%`;
 
-        // 1文字以上認識できていれば結果に反映
         if (filtered.length >= 1) {
           let isValid = true;
           if (cfg.regexPattern) {
@@ -778,7 +776,6 @@
             roiBox.classList.add('detected');
             setTimeout(() => roiBox.classList.remove('detected'), 400);
 
-            // 連続スキャン時でも信頼度45%以上なら即時表示
             if (!isAuto || conf >= 45) {
               resultInput.value = filtered;
               addHistory(filtered);
@@ -874,7 +871,11 @@
 
     renderRulePills(loadConfig());
     renderHistory();
-    window.addEventListener('DOMContentLoaded', initOCR);
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', initOCR);
+    } else {
+      initOCR();
+    }
   </script>
 </body>
 </html>
